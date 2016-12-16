@@ -9,12 +9,19 @@
 void tsh_loop(void);
 int tshcd(char **args);
 int tshpwd(char **args);
+void sig_fork(int signo);
 char *readline();
 char **splitline(char* line);
 int executefunc(char **args);
 int runforeground(char **args);
 int count = 0 ;
 char cwd[1024];
+void sig_fork(int signo){
+	int stat;
+	while(waitpid(-1,&stat,WNOHANG)>0);
+
+
+}
 char *builtin_str[] = {
 	//put build-in fau in arr
 	"cd",
@@ -28,6 +35,7 @@ int (*buildin_fun[])(char**)={
 };
 
 int main(int argc, char **argv){
+
 	tsh_loop();
 	return EXIT_SUCCESS;
 }
@@ -43,7 +51,7 @@ void tsh_loop(void){
 		args = splitline(line);
 		status = executefunc(args);
 	}while(status);
-	
+
 	free(line);
 	free(args);
 
@@ -112,14 +120,11 @@ int executefunc(char **args){
 int runforeground(char **args){
 	pid_t pid;
 	int status;
+	signal(SIGCHLD,sig_fork);
 	if((pid = fork())<0)
 		fprintf(stderr,"tsh: fork failed");
 	if(pid == 0){
 		//child
-		if(strcmp(args[count-1],"&")==0){
-			args[count-1]=NULL;
-			count--;
-		}
 		if(execvp(args[0],args) == -1){
 			if((args[0][0]!='.')&&(args[0][1]!='/'))
 				printf("%s: command not found\n",args[0]);
@@ -133,13 +138,13 @@ int runforeground(char **args){
 				waitpid(pid,&status,WUNTRACED);
 			}while(!WIFEXITED(status)&&!WIFSIGNALED(status));//if child not stop, keep waiting
 		}else{
-			waitpid(-1,&status,WNOHANG);		
+			waitpid(-1,&status,WNOHANG);
 		}
-		
-		
+
+
 	}else if(pid<0){
 		//error
-		perror("tsh");		
+		perror("tsh");
 	}
 	return 1;
 }
@@ -152,7 +157,7 @@ void runbackground(){
 
 int tshcd(char** args){
 
-	char* tmp;	
+	char* tmp;
 	char c;
 	char* path;
 
@@ -164,7 +169,7 @@ int tshcd(char** args){
 		tmp = args[1];
 		c = tmp[0];
 		if(args[0] == NULL){
-			
+
 			//no argument
 			/*chdir(getenv("HOME"));*/
 			fprintf(stderr, "tsh: expected argument to \"cd\"\n");
@@ -179,15 +184,15 @@ int tshcd(char** args){
 					perror("tsh");
 				}
 			}
-		}	
+		}
 	}
-	
-	
+
+
 	return 1;
 }
 
 int tshpwd(char** args){
-	
+
     char buff[256];
     getcwd(buff,sizeof(buff));
     printf("%s\n",buff);
